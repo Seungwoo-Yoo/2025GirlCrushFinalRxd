@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2025 GirlCrush Final Leader Board - RxD</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght=400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght[400;500;700]&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', 'Noto Sans KR', sans-serif; background-color: #111827; color: #d1d5db; }
         .tab { transition: all 0.2s ease-in-out; }
@@ -13,6 +13,12 @@
         .loader { border: 4px solid #4b5563; border-top: 4px solid #facc15; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .details-row.hidden, #wod-content.hidden { display: none; }
+        /* 💡 하이라이트 클래스 유지 */
+        .highlight {
+            background-color: #3b82f6 !important; /* Tailwind blue-500 */
+            color: #ffffff !important;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -44,7 +50,7 @@
                 WOD DETAILS
             </button>
             <div id="wod-content" class="hidden mt-4 p-4 bg-gray-800 rounded-lg text-left whitespace-pre-wrap max-w-2xl mx-auto">
-                </div>
+            </div>
         </div>
 
         <div id="status" class="h-8 flex items-center justify-center text-sm text-gray-400 mb-4"></div>
@@ -75,9 +81,14 @@
             event4: {
                 Rxd: { range: "'결과지'!Q43:S61", type: 'standard', wodRange: "'결과지'!D100" },
             },
-            // Timetable: 범위는 동일함 ('timetable'!A1:F24)
+            // Timetable: 하이라이트 범위 추가 ('timetable'!G1)
             timetable: {
-                Rxd: { range: "'timetable'!A1:F27", type: 'timetable', wodRange: null },
+                Rxd: { 
+                    range: "'timetable'!A1:F27", 
+                    type: 'timetable', 
+                    wodRange: null, 
+                    highlightRange: "'timetable'!G1" // 💡 G1 셀에서 하이라이트 행 번호를 가져옵니다.
+                },
             },
             // TOTAL RANK: 범위가 61행까지 (V43:AB61)로 업데이트됨
             total: {
@@ -93,7 +104,6 @@
 
         const tableContainer = document.getElementById('tableContainer');
         const statusDiv = document.getElementById('status');
-        const divisionTabsContainer = document.getElementById('division-tabs');
         const wodSection = document.getElementById('wod-section');
         const wodToggleButton = document.getElementById('wod-toggle-button');
         const wodContent = document.getElementById('wod-content');
@@ -121,6 +131,7 @@
                     currentEvent = tab.dataset.tab;
                     
                     // Timetable/Total 탭이 선택되면 WOD 섹션을 숨깁니다.
+                    // 💡 하이라이트 관련 섹션은 이제 없으므로 처리할 필요가 없습니다.
                     if (currentEvent === 'timetable' || currentEvent === 'total') {
                         wodSection.style.display = 'none';
                     } else {
@@ -158,8 +169,8 @@
 
         async function fetchAndDisplayData() {
             showLoading();
-            // currentDivision이 'Rxd'로 고정되어 있음
             const config = SHEET_DATA_MAP[currentEvent] ? SHEET_DATA_MAP[currentEvent][currentDivision] : null; 
+            
             if (!config || !config.range) {
                 if (currentEvent !== 'timetable' && currentEvent !== 'total') {
                     displayError('설정 오류: 현재 탭의 시트 정보가 없습니다. SHEET_DATA_MAP을 확인하세요.');
@@ -180,22 +191,35 @@
             }
             
             const leaderboardPromise = fetchData(config.range);
-            // Timetable/Total 탭이 아닐 때만 WOD를 가져옵니다.
             const wodPromise = (currentEvent !== 'timetable' && currentEvent !== 'total' && config.wodRange) ? fetchData(config.wodRange) : Promise.resolve(null);
+            
+            // 💡 Timetable 탭일 경우 하이라이트 범위 데이터도 함께 가져옵니다.
+            const highlightPromise = (currentEvent === 'timetable' && config.highlightRange) ? fetchData(config.highlightRange) : Promise.resolve(null);
 
 
             try {
-                const [leaderboardResult, wodResult] = await Promise.all([leaderboardPromise, wodPromise]);
+                const [leaderboardResult, wodResult, highlightResult] = await Promise.all([leaderboardPromise, wodPromise, highlightPromise]);
 
                 if (leaderboardResult) {
-                    renderTable(leaderboardResult, config);
+                    // 💡 Timetable의 경우 하이라이트 결과를 함께 전달합니다.
+                    if (currentEvent === 'timetable') {
+                        let highlightRowNumber = null;
+                        if (highlightResult && highlightResult[0] && highlightResult[0][0]) {
+                            // 시트에서 가져온 값을 정수로 변환합니다.
+                            highlightRowNumber = parseInt(highlightResult[0][0].trim()); 
+                            if (isNaN(highlightRowNumber)) highlightRowNumber = null;
+                        }
+                        renderTimetable(leaderboardResult, highlightRowNumber);
+                    } else {
+                         renderTable(leaderboardResult, config);
+                    }
+                   
                 } else {
-                     displayError('선택된 탭에 데이터가 없습니다. 시트 이름과 범위를 확인해주세요.');
+                    displayError('선택된 탭에 데이터가 없습니다. 시트 이름과 범위를 확인해주세요.');
                 }
                 
-                // Timetable/Total이 아닐 때만 WOD 섹션을 처리합니다.
+                // WOD 섹션 처리 (Timetable/Total 제외)
                 if (currentEvent !== 'timetable' && currentEvent !== 'total') {
-                    // 🚨 WOD가 비어있어도 wodSection.style.display='block'은 유지됩니다.
                     if (wodResult && wodResult.length > 0 && wodResult[0][0]) {
                         wodSection.style.display = 'block';
                         wodContent.textContent = wodResult[0][0];
@@ -227,13 +251,16 @@
             if (config.type === 'expandable') {
                 renderExpandableTable(data, config.visibleCols);
             } else if (config.type === 'timetable') {
-                renderTimetable(data);
+                // 이 함수에서는 highlightRowIndex를 0으로 전달하여 일반적인 시간표를 렌더링합니다.
+                // (실제 하이라이트는 fetchAndDisplayData에서 처리됨)
+                renderTimetable(data, null); 
             } else {
                 renderStandardTable(data);
             }
         }
         
-        function renderTimetable(data) {
+        // 💡 highlightRowNumber 인수를 추가했습니다. (시트 행 번호, 1부터 시작)
+        function renderTimetable(data, highlightRowNumber) {
             tableContainer.innerHTML = '';
             const table = document.createElement('table');
             table.className = "min-w-full divide-y divide-gray-700 table-fixed";
@@ -241,7 +268,7 @@
             const thead = document.createElement('thead');
             thead.className = "bg-gray-800";
             const headerRow = document.createElement('tr');
-            // 데이터가 비어있지 않은지 확인하고 헤더를 렌더링합니다.
+            
             if (!data || data.length === 0 || data[0].length === 0) {
                 displayError('시간표 데이터가 비어있습니다. 시트 범위를 확인하세요.');
                 return;
@@ -257,15 +284,26 @@
 
             const tbody = document.createElement('tbody');
             tbody.className = "divide-y divide-gray-800";
+            // 💡 헤더(data[0])를 제외한 데이터 행을 순회합니다. 
+            // 데이터 배열 인덱스 i는 시트의 행 번호와 일치합니다. (data[1] = 시트의 1번 행)
             for (let i = 1; i < data.length; i++) {
                 const rowData = data[i];
+                // i (배열 인덱스, 시트 행 번호)가 하이라이트 번호와 일치하는지 확인합니다.
+                const isHighlighted = (i === highlightRowNumber); 
+                
                 if (rowData.some(cell => cell && cell.trim() !== '')) { 
                     const tr = document.createElement('tr');
-                    const bgColor = (i % 2 === 0) ? 'bg-white/5' : 'bg-transparent';
-                    tr.className = `${bgColor} hover:bg-white/10`;
+                    let bgColor = (i % 2 === 0) ? 'bg-white/5' : 'bg-transparent';
+                    
+                    // 💡 하이라이트가 적용되면 기본 배경색을 덮어씁니다.
+                    tr.className = `${bgColor} hover:bg-white/10 ${isHighlighted ? 'highlight' : ''}`;
+                    
                     rowData.forEach((cellText, colIndex) => {
                         const td = document.createElement('td');
-                        td.className = "px-2 py-4 text-sm text-center text-gray-300 break-words";
+                        
+                        // 💡 하이라이트된 행의 텍스트 색상을 흰색으로 고정합니다.
+                        const textColor = isHighlighted ? 'text-white' : 'text-gray-300';
+                        td.className = `px-2 py-4 text-sm text-center ${textColor} break-words`;
                         
                         let content = cellText || '';
                         // 기존 로직 유지: HEAT, Time 열에서 줄바꿈 처리
