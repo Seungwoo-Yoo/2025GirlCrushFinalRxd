@@ -13,11 +13,11 @@
         .loader { border: 4px solid #4b5563; border-top: 4px solid #facc15; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .details-row.hidden, #wod-content.hidden { display: none; }
-        /* 💡 하이라이트 클래스 유지 */
+        /* 💡 하이라이트 클래스 수정: Emerald 500 (#10b981) 배경으로 변경하고, 굵게(700) 처리 */
         .highlight {
-            background-color: #3b82f6 !important; /* Tailwind blue-500 */
+            background-color: #10b981 !important; /* Emerald 500 */
             color: #ffffff !important;
-            font-weight: 600;
+            font-weight: 700 !important;
         }
     </style>
 </head>
@@ -131,7 +131,6 @@
                     currentEvent = tab.dataset.tab;
                     
                     // Timetable/Total 탭이 선택되면 WOD 섹션을 숨깁니다.
-                    // 💡 하이라이트 관련 섹션은 이제 없으므로 처리할 필요가 없습니다.
                     if (currentEvent === 'timetable' || currentEvent === 'total') {
                         wodSection.style.display = 'none';
                     } else {
